@@ -12,6 +12,10 @@ creds/
 *.pem
 *-sa.json
 
+# user-specific config (may contain ${} that resolve to secrets, or inline keys)
+config/pushers.config.yaml
+config/*.local.yaml
+
 # editor
 .vscode/
 .idea/

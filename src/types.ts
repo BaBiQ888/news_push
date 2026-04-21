@@ -91,13 +91,21 @@ export interface EnrichmentConfig {
   };
 }
 
+export type AIProviderName = 'anthropic' | 'gemini';
+
 export interface AIConfig {
-  provider: 'anthropic';
+  provider: AIProviderName;
   model: string;
+  /** Override API base URL (mainly for gemini / self-hosted proxy) */
+  apiBase?: string;
   maxItemsToSummarize?: number;
+  /** Whether to use inline prompt caching where the provider supports it */
   promptCaching?: boolean;
   /** Optional language hint for the summary, e.g. "zh-CN" */
   language?: string;
+  /** Override generation params */
+  maxTokens?: number;
+  temperature?: number;
 }
 
 export type PusherConfig =

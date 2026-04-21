@@ -1,4 +1,3 @@
-import Anthropic from '@anthropic-ai/sdk';
 import type {
   NewsItem,
   AISummaryItem,
@@ -10,6 +9,7 @@ import {
   buildSystemPrompt,
   buildUserPrompt,
 } from './prompts.js';
+import { buildProvider } from './providers/index.js';
 
 export interface SummarizeOptions {
   /** ISO date string for the report (YYYY-MM-DD) */
@@ -49,13 +49,6 @@ export async function summarize(
   cfg: AIConfig,
   opts: SummarizeOptions,
 ): Promise<DailyReport> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    throw new Error(
-      'ANTHROPIC_API_KEY is not set. Please export it before running the summarizer.',
-    );
-  }
-
   const language = cfg.language ?? DEFAULT_LANGUAGE;
   const maxItems = cfg.maxItemsToSummarize ?? DEFAULT_MAX_ITEMS;
   const promptCaching = cfg.promptCaching !== false;
@@ -67,40 +60,17 @@ export async function summarize(
   const systemPrompt = buildSystemPrompt(language);
   const userPrompt = buildUserPrompt(opts.date, itemsJson);
 
-  const client = new Anthropic({ apiKey });
-
-  const systemBlocks = promptCaching
-    ? [
-        {
-          type: 'text' as const,
-          text: systemPrompt,
-          cache_control: { type: 'ephemeral' as const },
-        },
-        {
-          type: 'text' as const,
-          text: `当日日期：${opts.date}`,
-        },
-      ]
-    : [
-        {
-          type: 'text' as const,
-          text: `${systemPrompt}\n\n当日日期：${opts.date}`,
-        },
-      ];
-
-  const response = await client.messages.create({
+  const provider = buildProvider(cfg);
+  const text = await provider.generate({
+    systemPrompt,
+    systemSuffix: `当日日期：${opts.date}`,
+    userMessage: userPrompt,
     model: cfg.model,
-    max_tokens: DEFAULT_MAX_TOKENS,
-    system: systemBlocks,
-    messages: [
-      {
-        role: 'user',
-        content: userPrompt,
-      },
-    ],
+    maxTokens: cfg.maxTokens ?? DEFAULT_MAX_TOKENS,
+    ...(typeof cfg.temperature === 'number' ? { temperature: cfg.temperature } : {}),
+    enableCaching: promptCaching,
   });
 
-  const text = extractText(response.content);
   const parsed = parseModelJson(text);
   const summaryItems = normalizeItems(parsed.items, selected);
 
@@ -120,7 +90,7 @@ export async function summarize(
     meta: {
       sourceCount: countSources(items),
       itemCount: summaryItems.length,
-      model: cfg.model,
+      model: `${provider.name}/${cfg.model}`,
     },
   };
 }
@@ -147,16 +117,6 @@ function toModelInput(item: NewsItem): ModelItemInput {
         : item.rawText;
   }
   return out;
-}
-
-function extractText(content: Anthropic.ContentBlock[]): string {
-  const parts: string[] = [];
-  for (const block of content) {
-    if (block.type === 'text') {
-      parts.push(block.text);
-    }
-  }
-  return parts.join('\n').trim();
 }
 
 function parseModelJson(text: string): ModelOutput {

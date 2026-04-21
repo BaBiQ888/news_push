@@ -47,8 +47,13 @@ src/
   enrichment/
     jina-reader.ts      # https://r.jina.ai 抓正文为 markdown
   ai/
-    summarizer.ts       # Claude API 调用，返回 DailyReport
+    summarizer.ts       # provider 无关，输出 DailyReport
     prompts.ts          # system prompt + 输出 JSON schema + 分类闭集
+    providers/
+      base.ts           # AIProvider 接口
+      anthropic.ts      # Claude（含 prompt caching）
+      gemini.ts         # Google Gemini（responseMimeType=application/json）
+      index.ts          # buildProvider 工厂
   pushers/              # 推送适配器
     feishu-bot.ts       # 飞书自定义群机器人 webhook（支持签名）
     feishu-doc.ts       # 飞书云文档 / 多维表格（tenant_access_token 自动管理）
@@ -66,6 +71,27 @@ launchd/
 data/                   # 运行时状态（git ignored）
 creds/                  # 凭证（git ignored）
 ```
+
+## AI 模型选择
+
+支持 Anthropic Claude 与 Google Gemini，在 `config/pushers.config.yaml` 的 `ai` 段切换：
+
+```yaml
+ai:
+  provider: gemini          # anthropic | gemini
+  model: gemini-3-pro       # claude-sonnet-4-6 | claude-opus-4-7 | claude-haiku-4-5-20251001 | gemini-3-pro | gemini-2.5-pro | ...
+  promptCaching: true       # Anthropic 生效；Gemini 忽略（用 generationConfig 强制 JSON）
+  language: zh-CN
+```
+
+对应在 `.env` 里至少设置一个匹配的 key：
+
+| Provider | 环境变量 | 申请入口 |
+|---|---|---|
+| anthropic | `ANTHROPIC_API_KEY` | https://console.anthropic.com |
+| gemini | `GEMINI_API_KEY`（或 `GOOGLE_AI_API_KEY`） | https://aistudio.google.com/apikey |
+
+加新的 provider：在 `src/ai/providers/` 新建实现 `AIProvider` 的文件，再在 `providers/index.ts` 的 `buildProvider` 加 case 即可。
 
 ## 各 pusher 凭证说明
 
