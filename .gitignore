@@ -1,0 +1,22 @@
+node_modules/
+dist/
+.env
+.env.local
+
+# runtime state
+data/*.json
+!data/.gitkeep
+
+# secrets
+creds/
+*.pem
+*-sa.json
+
+# editor
+.vscode/
+.idea/
+.DS_Store
+
+# logs
+*.log
+logs/

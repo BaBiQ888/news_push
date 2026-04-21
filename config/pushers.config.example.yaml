@@ -1,0 +1,58 @@
+# Copy to pushers.config.yaml and fill in your values.
+# ${ENV_VAR} placeholders are expanded from process env / .env file.
+
+sources:
+  hn_firebase:
+    enabled: true
+    storyType: top        # top | best | new
+    limit: 30
+  hn_algolia:
+    enabled: true
+    timeWindowHours: 24
+    queries:
+      - { query: "AI", minPoints: 50 }
+      - { query: "LLM", minPoints: 30 }
+      - { query: "Claude OR Anthropic", minPoints: 20 }
+
+enrichment:
+  jina_reader:
+    enabled: true
+    timeoutMs: 15000
+    maxConcurrency: 3
+
+ai:
+  provider: anthropic
+  model: claude-sonnet-4-6
+  maxItemsToSummarize: 20
+  promptCaching: true
+  language: zh-CN
+
+pushers:
+  - type: feishu_bot
+    enabled: true
+    webhook: ${FEISHU_BOT_WEBHOOK}
+    secret: ${FEISHU_BOT_SECRET}
+
+  - type: feishu_doc
+    enabled: false
+    appId: ${FEISHU_APP_ID}
+    appSecret: ${FEISHU_APP_SECRET}
+    target:
+      kind: bitable          # bitable | doc
+      appToken: bascxxxxxxx  # 多维表格 app token
+      tableId: tblxxxxxxx    # 表格 id
+
+  - type: google_sheets
+    enabled: false
+    credentialsFile: ./creds/gcp-sa.json
+    spreadsheetId: 1AbCxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+    sheetName: HN_Daily
+
+  - type: google_docs
+    enabled: false
+    credentialsFile: ./creds/gcp-sa.json
+    documentId: 1XyZxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+state:
+  dedupFile: ./data/seen.json
+  retentionDays: 30
