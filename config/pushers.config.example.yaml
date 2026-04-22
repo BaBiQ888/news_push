@@ -42,6 +42,13 @@ pushers:
     webhook: ${FEISHU_BOT_WEBHOOK}
     secret: ${FEISHU_BOT_SECRET}
 
+  - type: dingtalk_bot
+    enabled: false
+    webhook: ${DINGTALK_BOT_WEBHOOK}
+    secret: ${DINGTALK_BOT_SECRET}
+    # atMobiles: ["13800138000"]
+    # atAll: false
+
   - type: feishu_doc
     enabled: false
     appId: ${FEISHU_APP_ID}

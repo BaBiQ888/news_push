@@ -1,9 +1,11 @@
 import type { DailyReport, Pusher, PushResult, PusherConfig } from '../types.js';
+import { DingtalkBotPusher } from './dingtalk-bot.js';
 import { FeishuBotPusher } from './feishu-bot.js';
 import { FeishuDocPusher } from './feishu-doc.js';
 import { GoogleDocsPusher } from './google-docs.js';
 import { GoogleSheetsPusher } from './google-sheets.js';
 
+export { DingtalkBotPusher } from './dingtalk-bot.js';
 export { FeishuBotPusher } from './feishu-bot.js';
 export { FeishuDocPusher } from './feishu-doc.js';
 export { GoogleDocsPusher } from './google-docs.js';
@@ -19,6 +21,9 @@ export function buildPushers(configs: PusherConfig[]): Pusher[] {
         break;
       case 'feishu_doc':
         pushers.push(new FeishuDocPusher(c));
+        break;
+      case 'dingtalk_bot':
+        pushers.push(new DingtalkBotPusher(c));
         break;
       case 'google_sheets':
         pushers.push(new GoogleSheetsPusher(c));

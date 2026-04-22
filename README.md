@@ -102,6 +102,16 @@ ai:
 3. 如果你勾了"签名校验"，把 secret 填到 `FEISHU_BOT_SECRET`
 4. config 里把 `feishu_bot.enabled` 设为 `true`
 
+### 钉钉群机器人
+
+1. 群设置 → 智能群助手 → 添加机器人 → 自定义
+2. 安全设置至少选一项：**加签**（推荐）/ 关键词 / IP 白名单
+3. 把 webhook URL（含 `?access_token=...`）填到 `.env` 的 `DINGTALK_BOT_WEBHOOK`
+4. 加签的 secret 填到 `DINGTALK_BOT_SECRET`
+5. config 里 `dingtalk_bot.enabled` 设为 `true`，可选 `atMobiles` / `atAll`
+
+注意：钉钉 markdown 消息单条上限约 5000 字符，本项目已自动截断到 4500，长内容请配合云文档归档使用。
+
 ### 飞书云文档 / 多维表格
 
 1. https://open.feishu.cn 创建"自建应用"

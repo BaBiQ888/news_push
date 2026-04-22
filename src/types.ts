@@ -116,6 +116,18 @@ export type PusherConfig =
       secret?: string;
     }
   | {
+      type: 'dingtalk_bot';
+      enabled: boolean;
+      /** Full webhook URL including ?access_token=... */
+      webhook: string;
+      /** Optional sign secret if "加签" verification is enabled */
+      secret?: string;
+      /** Optional list of mobile numbers to @ */
+      atMobiles?: string[];
+      /** Whether to @all */
+      atAll?: boolean;
+    }
+  | {
       type: 'feishu_doc';
       enabled: boolean;
       appId: string;
