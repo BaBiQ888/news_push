@@ -120,29 +120,75 @@ function toModelInput(item: NewsItem): ModelItemInput {
 }
 
 function parseModelJson(text: string): ModelOutput {
-  const match = text.match(/\{[\s\S]*\}/);
-  if (!match) {
-    throw new Error(
-      `AI response did not contain a JSON object. Raw: ${text.slice(0, 500)}`,
-    );
-  }
+  const trimmed = text.trim();
   let parsed: unknown;
+  let candidate = trimmed;
   try {
-    parsed = JSON.parse(match[0]);
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    throw new Error(
-      `Failed to parse JSON from AI response: ${msg}. Raw: ${match[0].slice(0, 500)}`,
-    );
+    parsed = JSON.parse(trimmed);
+  } catch {
+    // Fall back: extract the first complete top-level JSON object.
+    // Models occasionally emit multiple objects concatenated or trailing prose,
+    // which a greedy regex would mis-capture as one invalid blob.
+    const extracted = extractFirstJsonObject(trimmed);
+    if (!extracted) {
+      throw new Error(
+        `AI response did not contain a JSON object. Raw: ${trimmed.slice(0, 500)}`,
+      );
+    }
+    candidate = extracted;
+    try {
+      parsed = JSON.parse(extracted);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new Error(
+        `Failed to parse JSON from AI response: ${msg}. Raw: ${extracted.slice(0, 500)}`,
+      );
+    }
   }
   if (
     typeof parsed !== 'object' ||
     parsed === null ||
     !Array.isArray((parsed as { items?: unknown }).items)
   ) {
-    throw new Error('AI JSON missing required "items" array.');
+    throw new Error(
+      `AI JSON missing required "items" array. Raw: ${candidate.slice(0, 500)}`,
+    );
   }
   return parsed as ModelOutput;
+}
+
+/** Walk the text string-aware and return the first balanced { ... } block. */
+function extractFirstJsonObject(text: string): string | null {
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+  let start = -1;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (escape) {
+      escape = false;
+      continue;
+    }
+    if (inString) {
+      if (ch === '\\') escape = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') {
+      inString = true;
+      continue;
+    }
+    if (ch === '{') {
+      if (depth === 0) start = i;
+      depth++;
+    } else if (ch === '}') {
+      depth--;
+      if (depth === 0 && start !== -1) {
+        return text.slice(start, i + 1);
+      }
+    }
+  }
+  return null;
 }
 
 function normalizeItems(
