@@ -29,8 +29,8 @@ jobs:
       NODE_ENV: production
       # Secrets — set these in GitHub repo Settings → Secrets and variables → Actions
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-      FEISHU_BOT_WEBHOOK: ${{ secrets.FEISHU_BOT_WEBHOOK }}
-      FEISHU_BOT_SECRET: ${{ secrets.FEISHU_BOT_SECRET }}
+      DINGTALK_BOT_WEBHOOK: ${{ secrets.DINGTALK_BOT_WEBHOOK }}
+      DINGTALK_BOT_SECRET: ${{ secrets.DINGTALK_BOT_SECRET }}
 
     steps:
       - name: Checkout

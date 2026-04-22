@@ -30,10 +30,10 @@ ai:
   maxTokens: 16384
 
 pushers:
-  - type: feishu_bot
+  - type: dingtalk_bot
     enabled: true
-    webhook: ${FEISHU_BOT_WEBHOOK}
-    secret: ${FEISHU_BOT_SECRET}
+    webhook: ${DINGTALK_BOT_WEBHOOK}
+    secret: ${DINGTALK_BOT_SECRET}
 
 state:
   dedupFile: ./data/seen.json
