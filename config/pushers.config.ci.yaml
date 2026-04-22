@@ -1,0 +1,40 @@
+# CI config used by .github/workflows/daily.yml
+# Secrets come from GitHub Repo Secrets (see workflow `env`).
+# Do NOT put plain-text secrets here — only ${ENV_VAR} placeholders.
+
+sources:
+  hn_firebase:
+    enabled: true
+    storyType: top
+    limit: 30
+  hn_algolia:
+    enabled: true
+    timeWindowHours: 24
+    queries:
+      - { query: "AI", minPoints: 50 }
+      - { query: "LLM", minPoints: 30 }
+      - { query: "Claude OR Anthropic", minPoints: 20 }
+
+enrichment:
+  jina_reader:
+    enabled: true
+    timeoutMs: 15000
+    maxConcurrency: 3
+
+ai:
+  provider: gemini
+  model: gemini-3-flash-preview
+  maxItemsToSummarize: 20
+  promptCaching: true
+  language: zh-CN
+  maxTokens: 16384
+
+pushers:
+  - type: feishu_bot
+    enabled: true
+    webhook: ${FEISHU_BOT_WEBHOOK}
+    secret: ${FEISHU_BOT_SECRET}
+
+state:
+  dedupFile: ./data/seen.json
+  retentionDays: 30

@@ -18,7 +18,7 @@ export interface SummarizeOptions {
 
 const DEFAULT_MAX_ITEMS = 20;
 const DEFAULT_LANGUAGE = 'zh-CN';
-const DEFAULT_MAX_TOKENS = 4096;
+const DEFAULT_MAX_TOKENS = 16384;
 const RAW_TEXT_LIMIT = 3000;
 
 interface ModelItemInput {

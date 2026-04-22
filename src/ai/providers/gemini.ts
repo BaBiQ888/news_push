@@ -2,6 +2,31 @@ import type { AIProvider, GenerationRequest } from './base.js';
 
 const DEFAULT_API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 const DEFAULT_MAX_TOKENS = 4096;
+const MAX_ATTEMPTS = 4;
+const BASE_BACKOFF_MS = 1000;
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+function isRetryableError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  if (err.name === 'AbortError') return false;
+  const cause = (err as { cause?: { code?: string } }).cause;
+  const code = cause?.code;
+  if (
+    code === 'UND_ERR_SOCKET' ||
+    code === 'ECONNRESET' ||
+    code === 'ECONNREFUSED' ||
+    code === 'ETIMEDOUT' ||
+    code === 'EAI_AGAIN' ||
+    code === 'ENOTFOUND' ||
+    code === 'UND_ERR_CONNECT_TIMEOUT' ||
+    code === 'UND_ERR_HEADERS_TIMEOUT' ||
+    code === 'UND_ERR_BODY_TIMEOUT'
+  ) {
+    return true;
+  }
+  return /fetch failed|socket hang up|other side closed|network/i.test(err.message);
+}
 
 interface GeminiResponse {
   candidates?: Array<{
@@ -55,13 +80,45 @@ export class GeminiProvider implements AIProvider {
       },
     };
 
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(body),
-    });
+    const payload = JSON.stringify(body);
 
-    const text = await res.text();
+    let res: Response | undefined;
+    let text = '';
+    let lastErr: unknown;
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      try {
+        res = await fetch(url, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: payload,
+        });
+        text = await res.text();
+        const retryableStatus = res.status === 408 || res.status === 429 || res.status >= 500;
+        if (!res.ok && retryableStatus && attempt < MAX_ATTEMPTS) {
+          const delay = BASE_BACKOFF_MS * 2 ** (attempt - 1);
+          console.warn(
+            `[gemini] HTTP ${res.status} on attempt ${attempt}/${MAX_ATTEMPTS}, retrying in ${delay}ms`,
+          );
+          await sleep(delay);
+          continue;
+        }
+        lastErr = undefined;
+        break;
+      } catch (err) {
+        lastErr = err;
+        if (!isRetryableError(err) || attempt === MAX_ATTEMPTS) throw err;
+        const delay = BASE_BACKOFF_MS * 2 ** (attempt - 1);
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn(
+          `[gemini] network error on attempt ${attempt}/${MAX_ATTEMPTS} (${msg}), retrying in ${delay}ms`,
+        );
+        await sleep(delay);
+      }
+    }
+
+    if (!res) {
+      throw lastErr instanceof Error ? lastErr : new Error('Gemini fetch failed');
+    }
     if (!res.ok) {
       throw new Error(`Gemini API ${res.status} ${res.statusText}: ${text.slice(0, 500)}`);
     }
@@ -87,6 +144,11 @@ export class GeminiProvider implements AIProvider {
     if (!partText) {
       throw new Error(
         `Gemini response missing text. finishReason=${candidate?.finishReason ?? 'unknown'}`,
+      );
+    }
+    if (candidate?.finishReason === 'MAX_TOKENS') {
+      throw new Error(
+        `Gemini hit MAX_TOKENS limit (output truncated at ${partText.length} chars). Increase ai.maxTokens in config.`,
       );
     }
     return partText.trim();

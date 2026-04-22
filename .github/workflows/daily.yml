@@ -1,0 +1,79 @@
+name: Daily HN Push
+
+on:
+  schedule:
+    # 00:15 UTC = 08:15 Asia/Shanghai. GitHub cron is best-effort and can be
+    # delayed 5–30 minutes, so don't expect minute-level precision.
+    - cron: '15 0 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (skip push)'
+        type: boolean
+        default: false
+
+concurrency:
+  group: daily-hn-push
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      CONFIG_PATH: ./config/pushers.config.ci.yaml
+      NODE_ENV: production
+      # Secrets — set these in GitHub repo Settings → Secrets and variables → Actions
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      FEISHU_BOT_WEBHOOK: ${{ secrets.FEISHU_BOT_WEBHOOK }}
+      FEISHU_BOT_SECRET: ${{ secrets.FEISHU_BOT_SECRET }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Restore dedup state
+        id: dedup-cache
+        uses: actions/cache@v4
+        with:
+          path: data/seen.json
+          # Save with a unique key per run; restore from any prior `seen-` cache.
+          key: seen-${{ github.run_id }}
+          restore-keys: |
+            seen-
+
+      - name: Show dedup state
+        run: |
+          if [ -f data/seen.json ]; then
+            echo "Restored seen.json: $(wc -c < data/seen.json) bytes, $(grep -c '"id"' data/seen.json || true) records"
+          else
+            echo "No prior seen.json — starting fresh"
+          fi
+
+      - name: Run news push
+        run: |
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            npx tsx scripts/run-once.ts --dry-run
+          else
+            npx tsx src/index.ts
+          fi
+
+      - name: Show updated dedup state
+        if: always()
+        run: |
+          if [ -f data/seen.json ]; then
+            echo "Updated seen.json: $(wc -c < data/seen.json) bytes"
+          fi
