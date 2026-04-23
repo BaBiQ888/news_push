@@ -1,4 +1,5 @@
-import type { AIProvider, GenerationRequest } from './base.js';
+import type { UsageInfo } from '../../types.js';
+import type { AIProvider, GenerationRequest, GenerationResult } from './base.js';
 
 const DEFAULT_API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 const DEFAULT_MAX_TOKENS = 4096;
@@ -36,6 +37,12 @@ interface GeminiResponse {
     finishReason?: string;
   }>;
   promptFeedback?: { blockReason?: string };
+  usageMetadata?: {
+    promptTokenCount?: number;
+    candidatesTokenCount?: number;
+    totalTokenCount?: number;
+    cachedContentTokenCount?: number;
+  };
   error?: { code?: number; message?: string; status?: string };
 }
 
@@ -51,7 +58,7 @@ export class GeminiProvider implements AIProvider {
     this.apiBase = (opts.apiBase ?? DEFAULT_API_BASE).replace(/\/$/, '');
   }
 
-  async generate(req: GenerationRequest): Promise<string> {
+  async generate(req: GenerationRequest): Promise<GenerationResult> {
     const apiKey = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_AI_API_KEY;
     if (!apiKey) {
       throw new Error('GEMINI_API_KEY (or GOOGLE_AI_API_KEY) is not set.');
@@ -151,6 +158,16 @@ export class GeminiProvider implements AIProvider {
         `Gemini hit MAX_TOKENS limit (output truncated at ${partText.length} chars). Increase ai.maxTokens in config.`,
       );
     }
-    return partText.trim();
+
+    const m = parsed.usageMetadata;
+    const usage: UsageInfo | undefined = m
+      ? {
+          inputTokens: m.promptTokenCount ?? 0,
+          outputTokens: m.candidatesTokenCount ?? 0,
+          ...(m.cachedContentTokenCount ? { cachedTokens: m.cachedContentTokenCount } : {}),
+        }
+      : undefined;
+
+    return { text: partText.trim(), ...(usage ? { usage } : {}) };
   }
 }

@@ -61,7 +61,7 @@ export async function summarize(
   const userPrompt = buildUserPrompt(opts.date, itemsJson);
 
   const provider = buildProvider(cfg);
-  const text = await provider.generate({
+  const result = await provider.generate({
     systemPrompt,
     systemSuffix: `当日日期：${opts.date}`,
     userMessage: userPrompt,
@@ -71,7 +71,8 @@ export async function summarize(
     enableCaching: promptCaching,
   });
 
-  const parsed = parseModelJson(text);
+  const parsed = parseModelJson(result.text);
+  reportCoverage(parsed.items, selected);
   const summaryItems = normalizeItems(parsed.items, selected);
 
   const markdown = renderMarkdown({
@@ -91,8 +92,37 @@ export async function summarize(
       sourceCount: countSources(items),
       itemCount: summaryItems.length,
       model: `${provider.name}/${cfg.model}`,
+      ...(result.usage ? { usage: result.usage } : {}),
     },
   };
+}
+
+function reportCoverage(modelItems: ModelOutputItem[], input: NewsItem[]): void {
+  const inputIds = new Set(input.map((it) => it.id));
+  const outputIds = new Set<string>();
+  for (const it of modelItems) {
+    if (it && typeof it.id === 'string') outputIds.add(it.id);
+  }
+
+  const missing: string[] = [];
+  for (const id of inputIds) if (!outputIds.has(id)) missing.push(id);
+
+  const invented: string[] = [];
+  for (const id of outputIds) if (!inputIds.has(id)) invented.push(id);
+
+  if (missing.length > 0) {
+    const lossPct = (missing.length / input.length) * 100;
+    console.warn(
+      `[ai] coverage: model dropped ${missing.length}/${input.length} (${lossPct.toFixed(1)}%) items. ` +
+        `Missing: ${missing.slice(0, 5).join(', ')}${missing.length > 5 ? '...' : ''}`,
+    );
+  }
+  if (invented.length > 0) {
+    console.warn(
+      `[ai] coverage: model invented ${invented.length} unknown ids: ` +
+        `${invented.slice(0, 5).join(', ')}${invented.length > 5 ? '...' : ''} (will be dropped)`,
+    );
+  }
 }
 
 function selectItems(items: NewsItem[], maxItems: number): NewsItem[] {
@@ -202,11 +232,12 @@ function normalizeItems(
   for (const it of modelItems) {
     if (!it || typeof it.id !== 'string') continue;
     const original = sourceById.get(it.id);
+    if (!original) continue; // drop AI-invented ids (already warned via reportCoverage)
     const title =
       typeof it.title === 'string' && it.title.length > 0
         ? it.title
-        : original?.title ?? it.id;
-    const url = it.url ?? original?.url;
+        : original.title;
+    const url = it.url ?? original.url;
     const category = allowed.has(it.category) ? it.category : '其它';
     const oneLineSummary =
       typeof it.oneLineSummary === 'string' ? it.oneLineSummary : '';

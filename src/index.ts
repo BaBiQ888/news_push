@@ -80,6 +80,12 @@ export async function run(options: RunOptions = {}): Promise<{
   console.log(`[run] summarizing with ${cfg.ai.model}...`);
   const report = await summarize(workingSet, cfg.ai, { date: today });
   console.log(`[run] report has ${report.items.length} items`);
+  if (report.meta.usage) {
+    const u = report.meta.usage;
+    const cached = u.cachedTokens ? ` cached=${u.cachedTokens}` : '';
+    const cacheWrite = u.cacheCreationTokens ? ` cacheWrite=${u.cacheCreationTokens}` : '';
+    console.log(`[run] tokens: in=${u.inputTokens} out=${u.outputTokens}${cached}${cacheWrite}`);
+  }
 
   let pushResults: PushResult[] = [];
   if (options.dryRun) {
@@ -99,8 +105,12 @@ export async function run(options: RunOptions = {}): Promise<{
     }
   }
 
-  dedupStore.markSeen(fresh);
-  dedupStore.save();
+  if (options.ignoreDedup) {
+    console.log('[run] state save skipped (--ignore-dedup)');
+  } else {
+    dedupStore.markSeen(fresh);
+    dedupStore.save();
+  }
 
   return {
     itemsFetched: fetched.length,

@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync, existsSync, renameSync } from 'node:fs';
 import { dirname } from 'node:path';
 
 interface DedupRecord {
@@ -196,7 +196,11 @@ export class DedupStore {
     this.evictOld();
     mkdirSync(dirname(this.filePath), { recursive: true });
     const file: DedupFile = { records: [...this.byId.values()] };
-    writeFileSync(this.filePath, JSON.stringify(file, null, 2), 'utf8');
+    // Atomic write: tmp file + rename. POSIX rename is atomic, so a crash mid-write
+    // can never leave the live file half-written.
+    const tmpPath = `${this.filePath}.tmp`;
+    writeFileSync(tmpPath, JSON.stringify(file, null, 2), 'utf8');
+    renameSync(tmpPath, this.filePath);
   }
 
   private load(): void {

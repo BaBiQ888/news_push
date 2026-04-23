@@ -48,7 +48,17 @@ export interface DailyReport {
     sourceCount: number;
     itemCount: number;
     model?: string;
+    usage?: UsageInfo;
   };
+}
+
+export interface UsageInfo {
+  inputTokens: number;
+  outputTokens: number;
+  /** Tokens served from cache (cheap). */
+  cachedTokens?: number;
+  /** Tokens written to cache (slightly more expensive than normal input). */
+  cacheCreationTokens?: number;
 }
 
 export interface PushResult {
