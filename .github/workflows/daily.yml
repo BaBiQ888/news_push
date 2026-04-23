@@ -25,6 +25,9 @@ jobs:
     timeout-minutes: 15
 
     env:
+      # Opt JS actions (checkout/setup-node/cache @v4) onto Node.js 24 runtime,
+      # ahead of GH's June 2026 forced switch. Removes the Node 20 deprecation warning.
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
       CONFIG_PATH: ./config/pushers.config.ci.yaml
       NODE_ENV: production
       # Secrets — set these in GitHub repo Settings → Secrets and variables → Actions
