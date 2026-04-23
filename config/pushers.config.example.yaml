@@ -5,14 +5,16 @@ sources:
   hn_firebase:
     enabled: true
     storyType: top        # top | best | new
-    limit: 30
+    limit: 50             # 拉得多 fetch 廉价；AI 仍按 maxItemsToSummarize 选
   hn_algolia:
     enabled: true
     timeWindowHours: 24
     queries:
-      - { query: "AI", minPoints: 50 }
-      - { query: "LLM", minPoints: 30 }
-      - { query: "Claude OR Anthropic", minPoints: 20 }
+      - { query: "AI", minPoints: 30 }
+      - { query: "LLM OR GPT OR Claude", minPoints: 30 }
+      - { query: "Anthropic OR OpenAI OR Google", minPoints: 50 }
+      - { query: "Rust OR Go OR Python", minPoints: 80 }
+      - { query: "startup OR YC", minPoints: 60 }
 
 enrichment:
   jina_reader:
@@ -28,7 +30,7 @@ ai:
   model: gemini-3-flash-preview
   # Override API base if needed (mainly for gemini proxy / self-hosted relay).
   # apiBase: https://generativelanguage.googleapis.com/v1beta
-  maxItemsToSummarize: 20
+  maxItemsToSummarize: 25
   # Inline prompt caching (Anthropic only currently; ignored by gemini).
   promptCaching: true
   language: zh-CN

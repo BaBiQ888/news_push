@@ -1,5 +1,6 @@
 import { loadConfig } from './config.js';
 import { fetchAll } from './sources/index.js';
+import { filterByRules } from './sources/filter.js';
 import { enrichWithJina } from './enrichment/jina-reader.js';
 import { summarize } from './ai/summarizer.js';
 import { buildPushers, pushAll } from './pushers/index.js';
@@ -9,7 +10,7 @@ import type { NewsItem, PushResult } from './types.js';
 interface RunOptions {
   /** Override config path */
   configPath?: string;
-  /** Skip dedup (re-summarize even if seen). Useful for re-runs. */
+  /** Skip persistent dedup (re-summarize even if seen). Useful for re-runs. */
   ignoreDedup?: boolean;
   /** Dry run — generate report but skip pushing. */
   dryRun?: boolean;
@@ -17,6 +18,7 @@ interface RunOptions {
 
 export async function run(options: RunOptions = {}): Promise<{
   itemsFetched: number;
+  itemsAfterRuleFilter: number;
   itemsAfterDedup: number;
   reportItems: number;
   pushResults: PushResult[];
@@ -29,17 +31,38 @@ export async function run(options: RunOptions = {}): Promise<{
   const fetched = await fetchAll(cfg.sources);
   console.log(`[run] fetched ${fetched.length} items from sources`);
 
+  const ruleFiltered = filterByRules(fetched);
+  if (ruleFiltered.stats.blocked > 0) {
+    const reasonStr = Object.entries(ruleFiltered.stats.reasons)
+      .map(([k, v]) => `${k}=${v}`)
+      .join(', ');
+    console.log(
+      `[run] rule-filter: ${ruleFiltered.kept.length} kept / ${ruleFiltered.stats.blocked} blocked (${reasonStr})`,
+    );
+  }
+
   const dedupPath = cfg.state?.dedupFile ?? './data/seen.json';
   const dedupStore = new DedupStore(dedupPath, cfg.state?.retentionDays);
-  const fresh: NewsItem[] = options.ignoreDedup
-    ? fetched
-    : dedupStore.filterUnseen(fetched);
-  console.log(`[run] ${fresh.length} fresh items after dedup`);
+
+  let fresh: NewsItem[];
+  if (options.ignoreDedup) {
+    fresh = ruleFiltered.kept;
+    console.log(`[run] dedup skipped (--ignore-dedup): ${fresh.length} items`);
+  } else {
+    const result = dedupStore.filterUnseen(ruleFiltered.kept);
+    fresh = result.kept;
+    const s = result.stats;
+    console.log(
+      `[run] dedup: ${fresh.length} kept / ${ruleFiltered.kept.length - fresh.length} blocked ` +
+        `(id=${s.blockedById}, url=${s.blockedByUrl}, title=${s.blockedByTitle}, batch=${s.blockedInBatch})`,
+    );
+  }
 
   if (fresh.length === 0) {
     console.log('[run] nothing new today, exiting');
     return {
       itemsFetched: fetched.length,
+      itemsAfterRuleFilter: ruleFiltered.kept.length,
       itemsAfterDedup: 0,
       reportItems: 0,
       pushResults: [],
@@ -76,11 +99,12 @@ export async function run(options: RunOptions = {}): Promise<{
     }
   }
 
-  dedupStore.markSeen(fresh.map((it) => it.id));
+  dedupStore.markSeen(fresh);
   dedupStore.save();
 
   return {
     itemsFetched: fetched.length,
+    itemsAfterRuleFilter: ruleFiltered.kept.length,
     itemsAfterDedup: fresh.length,
     reportItems: report.items.length,
     pushResults,

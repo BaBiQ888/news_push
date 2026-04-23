@@ -2,9 +2,9 @@ name: Daily HN Push
 
 on:
   schedule:
-    # 00:15 UTC = 08:15 Asia/Shanghai. GitHub cron is best-effort and can be
-    # delayed 5–30 minutes, so don't expect minute-level precision.
-    - cron: '15 0 * * *'
+    # GitHub cron is best-effort and can be delayed 5–30 minutes.
+    - cron: '15 0 * * *'    # 08:15 Asia/Shanghai — captures Asian-day + late North-American posts
+    - cron: '0 14 * * *'    # 22:00 Asia/Shanghai — captures EU/US working-hour rises
   workflow_dispatch:
     inputs:
       dry_run:
